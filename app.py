@@ -1,7 +1,6 @@
 import os
 
 from flask import Flask, render_template, request, flash, redirect, session, g
-from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
 from forms import UserAddForm, LoginForm, MessageForm, UserEditForm
@@ -21,7 +20,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = False
 app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', "it's a secret")
-toolbar = DebugToolbarExtension(app)
 
 connect_db(app)
 
@@ -257,7 +255,7 @@ def view_liked_posts(user_id):
         return redirect("/")
     liked_posts = g.user.likes
 
-    return render_template("users/liked.html")
+    return render_template("users/liked.html", liked_posts=liked_posts)
 
 
 @app.route("/users/add_like/<int:message_id>", methods=['POST'])
@@ -265,10 +263,12 @@ def add_like(message_id):
     if not g.user:
         flash("Access unauthorized.", "danger")
         return redirect("/")
-    like = Likes(user_id=g.user.id, message_id=message_id)
-    db.session.add(like)
-    db.session.commit()
-
+    message = Message.query.get_or_404(message_id)
+    if g.user.id != message.user_id:
+        like = Likes(user_id=g.user.id, message_id=message_id)
+        db.session.add(like)
+        db.session.commit()
+        return redirect("/")
     return redirect("/")
 
 
@@ -323,7 +323,7 @@ def messages_destroy(message_id):
     """Delete a message."""
 
     if not g.user:
-        flash("Access unauthorized.", "danger")
+        flash("Access unauthorized", "danger")
         return redirect("/")
 
     msg = Message.query.get(message_id)
